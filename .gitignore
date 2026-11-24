@@ -1,0 +1,6 @@
+__pycache__/ 
+*.pyc 
+model/cnn_model.keras 
+dataset/ 
+*.zip 
+.env 

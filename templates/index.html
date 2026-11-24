@@ -1,0 +1,240 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>CNN Image Classifier &amp; AI Vision Lab</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+</head>
+<body>
+  <!-- Celebration Confetti Container -->
+  <div id="confettiContainer" class="confetti-container" pointer-events="none"></div>
+
+  <div class="app-container">
+    <!-- Header -->
+    <header class="app-header">
+      <div class="badge-tag">Deep Learning &bull; Grad-CAM XAI &bull; Vision Lab</div>
+      <h1>CNN Image Classifier &amp; Vision Lab</h1>
+      <p class="subtitle">Classify images, inspect neural attention heatmaps with Grad-CAM, or play the live webcam scavenger hunt!</p>
+
+      {% if not model_ready %}
+      <div class="warning-banner" id="modelWarning">
+        <span class="warning-icon">&#9888;</span>
+        <div>
+          <strong>Model Not Trained Yet:</strong> Please run <code>python train.py</code> in your project directory to generate the classifier model.
+        </div>
+      </div>
+      {% endif %}
+    </header>
+
+    <!-- Main Grid -->
+    <main class="main-grid">
+      <!-- Input Panel Card -->
+      <section class="card input-card">
+        <!-- Input Tabs Navigation -->
+        <div class="tabs-nav" id="tabsNav">
+          <button type="button" class="tab-btn active" data-tab="upload">&#128193; File Upload</button>
+          <button type="button" class="tab-btn" data-tab="webcam">&#128247; Live Webcam</button>
+          <button type="button" class="tab-btn" data-tab="url">&#128279; Image URL</button>
+          <button type="button" class="tab-btn" data-tab="game">&#127918; Object Hunt</button>
+        </div>
+
+        <!-- TAB 1: File Upload -->
+        <div class="tab-pane active" id="tabUpload">
+          <div class="dropzone" id="dropzone">
+            <input type="file" id="fileInput" accept=".jpg,.jpeg,.png,image/jpeg,image/png" hidden>
+            <div class="dropzone-content">
+              <div class="upload-icon">&#128247;</div>
+              <p class="dropzone-text"><strong>Drag &amp; drop an image here</strong> or <span class="browse-link">browse</span></p>
+              <p class="dropzone-hint">Supported formats: <strong>JPG, JPEG, PNG</strong> (Up to 16MB)</p>
+            </div>
+          </div>
+        </div>
+
+        <!-- TAB 2: Live Webcam -->
+        <div class="tab-pane" id="tabWebcam">
+          <div class="webcam-box">
+            <div class="video-container">
+              <video id="webcamVideo" autoplay playsinline muted></video>
+              <div class="camera-placeholder" id="cameraPlaceholder">
+                <span class="cam-icon">&#128249;</span>
+                <p>Camera is currently turned off</p>
+                <button type="button" class="btn btn-primary btn-sm" id="startCamBtn">Enable Camera</button>
+              </div>
+            </div>
+            <div class="webcam-controls" id="webcamControls" style="display: none;">
+              <button type="button" class="btn btn-secondary btn-sm" id="flipCamBtn">&#128260; Flip Camera</button>
+              <button type="button" class="btn btn-primary" id="captureBtn">&#128248; Capture &amp; Classify</button>
+              <button type="button" class="btn btn-secondary btn-sm" id="stopCamBtn">&#9209; Stop</button>
+            </div>
+          </div>
+        </div>
+
+        <!-- TAB 3: Image URL -->
+        <div class="tab-pane" id="tabUrl">
+          <div class="url-input-box">
+            <label for="imageUrlInput" class="input-label">Paste public image URL:</label>
+            <div class="url-input-group">
+              <input type="url" id="imageUrlInput" placeholder="https://example.com/animal.jpg" class="text-input">
+              <button type="button" class="btn btn-primary" id="fetchUrlBtn">Load Image</button>
+            </div>
+            <div class="sample-pills">
+              <span class="sample-label">Quick test links:</span>
+              <button type="button" class="sample-pill" data-url="https://upload.wikimedia.org/wikipedia/commons/thumb/1/1c/Anim1754_-_Flickr_-_NOAA_Photo_Library.jpg/640px-Anim1754_-_Flickr_-_NOAA_Photo_Library.jpg">Whale (Mammal)</button>
+              <button type="button" class="sample-pill" data-url="https://upload.wikimedia.org/wikipedia/commons/thumb/d/db/Bald_eagle_about_to_fly_in_Alaska_%282016%29.jpg/640px-Bald_eagle_about_to_fly_in_Alaska_%282016%29.jpg">Eagle (Bird)</button>
+              <button type="button" class="sample-pill" data-url="https://upload.wikimedia.org/wikipedia/commons/thumb/8/8a/Panther_Chameleon_738367_%28cropped%29.jpg/640px-Panther_Chameleon_738367_%28cropped%29.jpg">Chameleon (Reptile)</button>
+            </div>
+          </div>
+        </div>
+
+        <!-- TAB 4: Scavenger Game Mode -->
+        <div class="tab-pane" id="tabGame">
+          <div class="game-dashboard">
+            <!-- Quest HUD Header -->
+            <div class="game-hud">
+              <div class="quest-banner">
+                <span class="quest-label">&#127919; CURRENT MISSION:</span>
+                <span class="quest-target" id="gameTargetClass">MAMMALS</span>
+              </div>
+              <div class="game-stats">
+                <div class="stat-badge"><span class="stat-icon">&#11088;</span> Score: <strong id="gameScore">0</strong></div>
+                <div class="stat-badge"><span class="stat-icon">&#128293;</span> Streak: <strong id="gameStreak">0</strong></div>
+              </div>
+            </div>
+
+            <p class="game-hint" id="gameHint">
+              <strong>Hint:</strong> Point camera at a dog, cat, plush toy, or an animal photo on your phone screen!
+            </p>
+
+            <!-- Game Viewfinder -->
+            <div class="game-viewfinder">
+              <video id="gameVideo" autoplay playsinline muted></video>
+              <div class="viewfinder-reticle">
+                <div class="reticle-corner top-left"></div>
+                <div class="reticle-corner top-right"></div>
+                <div class="reticle-corner bottom-left"></div>
+                <div class="reticle-corner bottom-right"></div>
+                <div class="reticle-status" id="gameScanStatus">Ready for scan</div>
+              </div>
+              <div class="game-cam-off" id="gameCamOff">
+                <span>&#127918;</span>
+                <button type="button" class="btn btn-primary" id="startGameCamBtn">Start Game Camera</button>
+              </div>
+            </div>
+
+            <!-- Game Controls -->
+            <div class="game-controls">
+              <button type="button" class="btn btn-primary" id="gameScanBtn" disabled>&#128065; Check Object</button>
+              <button type="button" class="btn btn-secondary btn-sm" id="gameSkipBtn">&#9197; Skip Mission</button>
+              <label class="auto-scan-toggle">
+                <input type="checkbox" id="gameAutoScan">
+                <span class="toggle-slider"></span>
+                <span class="toggle-text">Auto-Scan (1.5s)</span>
+              </label>
+            </div>
+          </div>
+        </div>
+
+        <!-- Hidden canvas for capturing video frames -->
+        <canvas id="snapshotCanvas" style="display: none;"></canvas>
+
+        <!-- Common Image Preview Pane -->
+        <div class="preview-container" id="previewContainer" style="display: none;">
+          <!-- View Mode Switcher (Original vs Grad-CAM) -->
+          <div class="view-mode-bar" id="viewModeBar" style="display: none;">
+            <div class="view-mode-tabs">
+              <button type="button" class="mode-btn active" id="viewOriginalBtn">&#128444; Original</button>
+              <button type="button" class="mode-btn" id="viewGradcamBtn">&#128293; Grad-CAM Attention</button>
+            </div>
+            <span class="gradcam-badge" id="gradcamBadge">&#128161; AI Attention Heatmap Ready</span>
+          </div>
+
+          <div class="image-wrapper">
+            <img id="imagePreview" src="" alt="Selected Preview">
+          </div>
+
+          <div class="file-details">
+            <span class="file-name" id="fileName">image.jpg</span>
+            <span class="file-size" id="fileSize">1.2 MB</span>
+          </div>
+
+          <div class="action-buttons">
+            <button type="button" class="btn btn-secondary" id="removeBtn">&#10005; Change / Retake</button>
+            <button type="button" class="btn btn-primary" id="predictBtn">
+              <span class="btn-text">Classify Image</span>
+              <span class="btn-spinner" id="btnSpinner" style="display: none;"></span>
+            </button>
+          </div>
+        </div>
+
+        <!-- Alert Banner -->
+        <div class="alert-box" id="alertBox" style="display: none;">
+          <span class="alert-icon" id="alertIcon">&#9888;</span>
+          <span class="alert-message" id="alertMessage"></span>
+        </div>
+      </section>
+
+      <!-- Prediction Results Card -->
+      <section class="card results-card" id="resultsCard">
+        <h2 class="card-title">Classification &amp; Explainability</h2>
+
+        <!-- Placeholder state -->
+        <div class="results-placeholder" id="resultsPlaceholder">
+          <div class="placeholder-icon">&#128269;</div>
+          <p>Provide an image via file, live camera, or URL, then click <strong>Classify Image</strong>.</p>
+        </div>
+
+        <!-- Loading State -->
+        <div class="loading-state" id="loadingState" style="display: none;">
+          <div class="spinner"></div>
+          <p id="loadingText">Processing through CNN &amp; computing Grad-CAM gradients...</p>
+        </div>
+
+        <!-- Active Results Display -->
+        <div class="results-content" id="resultsContent" style="display: none;">
+          <!-- Primary Prediction -->
+          <div class="primary-result">
+            <div class="result-badge">Top Prediction</div>
+            <div class="predicted-name" id="topClassName">Class Name</div>
+            <div class="confidence-container">
+              <span class="confidence-label">Confidence:</span>
+              <span class="confidence-value" id="topConfidenceVal">98.5%</span>
+            </div>
+          </div>
+
+          <!-- Top 3 Ranking Breakdown -->
+          <div class="breakdown-section">
+            <h3 class="breakdown-title">Top 3 Candidates</h3>
+            <div class="top-list" id="topList">
+              <!-- Dynamically populated via JS -->
+            </div>
+          </div>
+
+          <!-- Explainable AI Explanation Box -->
+          <div class="xai-info-box" id="xaiInfoBox">
+            <div class="xai-title">&#128300; Explainable AI (Grad-CAM)</div>
+            <p class="xai-desc">
+              The attention heatmap highlights pixels where the convolutional filters activated most intensely.
+              Use the <strong>"Grad-CAM Attention"</strong> tab above to view the highlighted features.
+            </p>
+          </div>
+
+          <div class="footer-note">
+            Model backbone: MobileNetV2 / Deep CNN &bull; Input size: 150&times;150 px
+          </div>
+        </div>
+      </section>
+    </main>
+
+    <!-- Footer -->
+    <footer class="app-footer">
+      <p>Convolutional Neural Network Classifier &bull; Flask &bull; TensorFlow / Keras &bull; Explainable AI</p>
+    </footer>
+  </div>
+
+  <script src="{{ url_for('static', filename='js/script.js') }}"></script>
+</body>
+</html>
